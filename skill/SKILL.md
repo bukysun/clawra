@@ -6,7 +6,7 @@ allowed-tools: Bash(npm:*) Bash(npx:*) Bash(openclaw:*) Bash(uv:*) Read Write We
 
 # Clawra Selfie
 
-Edit a fixed reference image using xAI's Grok Imagine model and distribute it across messaging platforms (WhatsApp, Telegram, Discord, Slack, etc.) via OpenClaw.
+Edit a fixed reference image using Gemini 3 Pro Image via OpenRouter (nano-banana-pro skill) and distribute it across messaging platforms (WhatsApp, Telegram, Discord, Slack, etc.) via OpenClaw.
 
 ## Reference Image
 
@@ -95,8 +95,13 @@ NBP_SCRIPT="$HOME/.openclaw/workspace/skills/nano-banana-pro/scripts/generate_im
 if [ ! -f "$NBP_SCRIPT" ]; then
   NBP_SCRIPT="$HOME/.openclaw/skills/nano-banana-pro/scripts/generate_image.py"
 fi
+if [ ! -f "$NBP_SCRIPT" ]; then
+  echo "Error: nano-banana-pro script not found. Install the skill first."
+  exit 1
+fi
 
-REFERENCE_IMAGE="{baseDir}/assets/clawra.png"
+REFERENCE_IMAGE="$(dirname "$0")/../assets/clawra.png"
+# When called via SKILL.md, replace with the skill's actual install path
 OUTPUT_FILE="/tmp/$(date +%Y-%m-%d-%H-%M-%S)-clawra-selfie.png"
 
 OPENROUTER_API_KEY="$OPENROUTER_API_KEY" uv run "$NBP_SCRIPT" \
@@ -134,85 +139,32 @@ curl -X POST "http://localhost:18789/message" \
 
 ## Complete Script Example
 
+See `scripts/clawra-selfie.sh` for a full working implementation using nano-banana-pro.
+
+Abbreviated flow:
 ```bash
 #!/bin/bash
-# grok-imagine-edit-send.sh
+# Prerequisites: OPENROUTER_API_KEY set, uv installed, nano-banana-pro skill installed
 
-# Check required environment variables
-if [ -z "$FAL_KEY" ]; then
-  echo "Error: FAL_KEY environment variable not set"
-  exit 1
-fi
+REFERENCE_IMAGE="$(dirname "$0")/../assets/clawra.png"
+OUTPUT_FILE="/tmp/$(date +%Y-%m-%d-%H-%M-%S)-clawra-selfie.png"
 
-# Fixed reference image
-REFERENCE_IMAGE="https://cdn.jsdelivr.net/gh/SumeLabs/clawra@main/assets/clawra.png"
+# Build prompt (mirror or direct mode)
+PROMPT="make a pic of this person, but wearing a cowboy hat. the person is taking a mirror selfie"
 
-USER_CONTEXT="$1"
-CHANNEL="$2"
-MODE="${3:-auto}"  # mirror, direct, or auto
-CAPTION="${4:-Edited with Grok Imagine}"
+# Generate image
+NBP_SCRIPT="$HOME/.openclaw/workspace/skills/nano-banana-pro/scripts/generate_image.py"
+[ ! -f "$NBP_SCRIPT" ] && NBP_SCRIPT="$HOME/.openclaw/skills/nano-banana-pro/scripts/generate_image.py"
+[ ! -f "$NBP_SCRIPT" ] && { echo "Error: nano-banana-pro not found"; exit 1; }
 
-if [ -z "$USER_CONTEXT" ] || [ -z "$CHANNEL" ]; then
-  echo "Usage: $0 <user_context> <channel> [mode] [caption]"
-  echo "Modes: mirror, direct, auto (default)"
-  echo "Example: $0 'wearing a cowboy hat' '#general' mirror"
-  echo "Example: $0 'a cozy cafe' '#general' direct"
-  exit 1
-fi
+NBP_OUTPUT=$(OPENROUTER_API_KEY="$OPENROUTER_API_KEY" uv run "$NBP_SCRIPT" \
+  --prompt "$PROMPT" --filename "$OUTPUT_FILE" -i "$REFERENCE_IMAGE")
 
-# Auto-detect mode based on keywords
-if [ "$MODE" == "auto" ]; then
-  if echo "$USER_CONTEXT" | grep -qiE "outfit|wearing|clothes|dress|suit|fashion|full-body|mirror"; then
-    MODE="mirror"
-  elif echo "$USER_CONTEXT" | grep -qiE "cafe|restaurant|beach|park|city|close-up|portrait|face|eyes|smile"; then
-    MODE="direct"
-  else
-    MODE="mirror"  # default
-  fi
-  echo "Auto-detected mode: $MODE"
-fi
+IMAGE_PATH=$(echo "$NBP_OUTPUT" | grep '^MEDIA:' | sed 's/^MEDIA: //')
+[ -z "$IMAGE_PATH" ] && { echo "Error: no image generated"; exit 1; }
 
-# Construct the prompt based on mode
-if [ "$MODE" == "direct" ]; then
-  EDIT_PROMPT="a close-up selfie taken by herself at $USER_CONTEXT, direct eye contact with the camera, looking straight into the lens, eyes centered and clearly visible, not a mirror selfie, phone held at arm's length, face fully visible"
-else
-  EDIT_PROMPT="make a pic of this person, but $USER_CONTEXT. the person is taking a mirror selfie"
-fi
-
-echo "Mode: $MODE"
-echo "Editing reference image with prompt: $EDIT_PROMPT"
-
-# Edit image (using jq for proper JSON escaping)
-JSON_PAYLOAD=$(jq -n \
-  --arg image_url "$REFERENCE_IMAGE" \
-  --arg prompt "$EDIT_PROMPT" \
-  '{image_url: $image_url, prompt: $prompt, num_images: 1, output_format: "jpeg"}')
-
-RESPONSE=$(curl -s -X POST "https://fal.run/xai/grok-imagine-image/edit" \
-  -H "Authorization: Key $FAL_KEY" \
-  -H "Content-Type: application/json" \
-  -d "$JSON_PAYLOAD")
-
-# Extract image URL
-IMAGE_URL=$(echo "$RESPONSE" | jq -r '.images[0].url')
-
-if [ "$IMAGE_URL" == "null" ] || [ -z "$IMAGE_URL" ]; then
-  echo "Error: Failed to edit image"
-  echo "Response: $RESPONSE"
-  exit 1
-fi
-
-echo "Image edited: $IMAGE_URL"
-echo "Sending to channel: $CHANNEL"
-
-# Send via OpenClaw
-openclaw message send \
-  --action send \
-  --channel "$CHANNEL" \
-  --message "$CAPTION" \
-  --media "$IMAGE_URL"
-
-echo "Done!"
+# Send
+openclaw message send --action send --channel "$CHANNEL" --message "📸" --media "$IMAGE_PATH"
 ```
 
 ## Node.js/TypeScript Implementation
@@ -259,7 +211,7 @@ openclaw gateway start
 - **OPENROUTER_API_KEY missing**: Ensure the API key is set in environment
 - **Image edit failed**: Check prompt content and API quota
 - **OpenClaw send failed**: Verify gateway is running and channel exists
-- **Rate limits**: fal.ai has rate limits; implement retry logic if needed
+- **Rate limits**: OpenRouter has rate limits; implement retry logic if needed
 
 ## Tips
 
