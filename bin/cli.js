@@ -170,7 +170,7 @@ ${c("magenta", "│")}  ${c("bright", "Clawra Selfie")} - OpenClaw Skill Install
 ${c("magenta", "└─────────────────────────────────────────┘")}
 
 Add selfie generation superpowers to your OpenClaw agent!
-Uses ${c("cyan", "xAI Grok Imagine")} via ${c("cyan", "OpenRouter")} for image editing.
+Uses ${c("cyan", "Gemini 3 Pro Image")} via ${c("cyan", "OpenRouter")} for image editing.
 `);
 }
 
@@ -213,7 +213,7 @@ async function getOpenRouterApiKey(rl) {
 
   const API_KEY_URL = "https://openrouter.ai/keys";
 
-  log(`\nTo use Grok Imagine, you need an OpenRouter API key.`);
+  log(`\nTo use nano-banana-pro (Gemini 3 Pro Image), you need an OpenRouter API key.`);
   log(`${c("cyan", "→")} Get your key from: ${c("bright", API_KEY_URL)}\n`);
 
   const openIt = await ask(rl, "Open OpenRouter in browser? (Y/n): ");
