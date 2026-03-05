@@ -36,7 +36,7 @@ OPENCLAW_GATEWAY_TOKEN=your_token        # From: openclaw doctor --generate-gate
 ### Workflow
 
 1. **Get user prompt** for how to edit the image
-2. **Edit image** via fal.ai Grok Imagine Edit API with fixed reference
+2. **Edit image** via nano-banana-pro (Gemini 3 Pro via OpenRouter) using the local reference image
 3. **Extract image URL** from response
 4. **Send to OpenClaw** with target channel(s)
 
