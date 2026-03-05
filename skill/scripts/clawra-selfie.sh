@@ -1,162 +1,127 @@
 #!/bin/bash
-# grok-imagine-send.sh
-# Generate an image with Grok Imagine and send it via OpenClaw
+# clawra-selfie.sh
+# Edit Clawra's reference image and send to a channel via OpenClaw
 #
-# Usage: ./grok-imagine-send.sh "<prompt>" "<channel>" ["<caption>"]
+# Usage: ./clawra-selfie.sh "<user_context>" "<channel>" [mode] [caption]
 #
 # Environment variables required:
-#   FAL_KEY - Your fal.ai API key
+#   OPENROUTER_API_KEY - Your OpenRouter API key (https://openrouter.ai/keys)
 #
 # Example:
-#   FAL_KEY=your_key ./grok-imagine-send.sh "A sunset over mountains" "#art" "Check this out!"
+#   OPENROUTER_API_KEY=your_key ./clawra-selfie.sh "wearing a cowboy hat" "#general" mirror
 
 set -euo pipefail
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
+log_info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
+log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 # Check required environment variables
-if [ -z "${FAL_KEY:-}" ]; then
-    log_error "FAL_KEY environment variable not set"
-    echo "Get your API key from: https://fal.ai/dashboard/keys"
-    exit 1
+if [ -z "${OPENROUTER_API_KEY:-}" ]; then
+  log_error "OPENROUTER_API_KEY environment variable not set"
+  echo "Get your API key from: https://openrouter.ai/keys"
+  exit 1
 fi
 
-# Check for jq
-if ! command -v jq &> /dev/null; then
-    log_error "jq is required but not installed"
-    echo "Install with: brew install jq (macOS) or apt install jq (Linux)"
-    exit 1
+# Check for uv
+if ! command -v uv &> /dev/null; then
+  log_error "uv is required but not installed"
+  echo "Install with: curl -LsSf https://astral.sh/uv/install.sh | sh"
+  exit 1
 fi
 
-# Check for openclaw
-if ! command -v openclaw &> /dev/null; then
-    log_warn "openclaw CLI not found - will attempt direct API call"
-    USE_CLI=false
-else
-    USE_CLI=true
+# Locate nano-banana-pro script
+NBP_SCRIPT="$HOME/.openclaw/workspace/skills/nano-banana-pro/scripts/generate_image.py"
+if [ ! -f "$NBP_SCRIPT" ]; then
+  NBP_SCRIPT="$HOME/.openclaw/skills/nano-banana-pro/scripts/generate_image.py"
+fi
+if [ ! -f "$NBP_SCRIPT" ]; then
+  log_error "nano-banana-pro not found. Install it via OpenClaw skill marketplace."
+  exit 1
 fi
 
 # Parse arguments
-PROMPT="${1:-}"
+USER_CONTEXT="${1:-}"
 CHANNEL="${2:-}"
-CAPTION="${3:-Generated with Grok Imagine}"
-ASPECT_RATIO="${4:-1:1}"
-OUTPUT_FORMAT="${5:-jpeg}"
+MODE="${3:-auto}"
+CAPTION="${4:-}"
 
-if [ -z "$PROMPT" ] || [ -z "$CHANNEL" ]; then
-    echo "Usage: $0 <prompt> <channel> [caption] [aspect_ratio] [output_format]"
-    echo ""
-    echo "Arguments:"
-    echo "  prompt        - Image description (required)"
-    echo "  channel       - Target channel (required) e.g., #general, @user"
-    echo "  caption       - Message caption (default: 'Generated with Grok Imagine')"
-    echo "  aspect_ratio  - Image ratio (default: 1:1) Options: 2:1, 16:9, 4:3, 1:1, 3:4, 9:16"
-    echo "  output_format - Image format (default: jpeg) Options: jpeg, png, webp"
-    echo ""
-    echo "Example:"
-    echo "  $0 \"A cyberpunk city at night\" \"#art-gallery\" \"AI Art!\""
-    exit 1
+if [ -z "$USER_CONTEXT" ] || [ -z "$CHANNEL" ]; then
+  echo "Usage: $0 <user_context> <channel> [mode] [caption]"
+  echo "Modes: mirror, direct, auto (default)"
+  echo "Example: $0 'wearing a cowboy hat' '#general' mirror"
+  exit 1
 fi
 
-log_info "Generating image with Grok Imagine..."
+# Reference image — co-located in this skill's assets/
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REFERENCE_IMAGE="$SCRIPT_DIR/../assets/clawra.png"
+
+if [ ! -f "$REFERENCE_IMAGE" ]; then
+  log_error "Reference image not found at: $REFERENCE_IMAGE"
+  exit 1
+fi
+
+# Auto-detect mode
+if [ "$MODE" == "auto" ]; then
+  if echo "$USER_CONTEXT" | grep -qiE "outfit|wearing|clothes|dress|suit|fashion|full-body|mirror"; then
+    MODE="mirror"
+  elif echo "$USER_CONTEXT" | grep -qiE "cafe|restaurant|beach|park|city|close-up|portrait|face|eyes|smile"; then
+    MODE="direct"
+  else
+    MODE="mirror"
+  fi
+  log_info "Auto-detected mode: $MODE"
+fi
+
+# Build prompt
+if [ "$MODE" == "direct" ]; then
+  PROMPT="a close-up selfie taken by herself at $USER_CONTEXT, direct eye contact with the camera, looking straight into the lens, eyes centered and clearly visible, not a mirror selfie, phone held at arm's length, face fully visible"
+else
+  PROMPT="make a pic of this person, but $USER_CONTEXT. the person is taking a mirror selfie"
+fi
+
+log_info "Mode: $MODE"
 log_info "Prompt: $PROMPT"
-log_info "Aspect ratio: $ASPECT_RATIO"
 
-# Generate image via fal.ai
-RESPONSE=$(curl -s -X POST "https://fal.run/xai/grok-imagine-image" \
-    -H "Authorization: Key $FAL_KEY" \
-    -H "Content-Type: application/json" \
-    -d "{
-        \"prompt\": $(echo "$PROMPT" | jq -Rs .),
-        \"num_images\": 1,
-        \"aspect_ratio\": \"$ASPECT_RATIO\",
-        \"output_format\": \"$OUTPUT_FORMAT\"
-    }")
+# Output filename
+OUTPUT_FILE="/tmp/$(date +%Y-%m-%d-%H-%M-%S)-clawra-selfie.png"
 
-# Check for errors in response
-if echo "$RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
-    ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error // .detail // "Unknown error"')
-    log_error "Image generation failed: $ERROR_MSG"
-    exit 1
+# Generate image with nano-banana-pro
+log_info "Generating image with nano-banana-pro..."
+NBP_OUTPUT=$(OPENROUTER_API_KEY="$OPENROUTER_API_KEY" uv run "$NBP_SCRIPT" \
+  --prompt "$PROMPT" \
+  --filename "$OUTPUT_FILE" \
+  -i "$REFERENCE_IMAGE")
+
+echo "$NBP_OUTPUT"
+
+# Extract local file path from MEDIA: line
+IMAGE_PATH=$(echo "$NBP_OUTPUT" | grep '^MEDIA:' | sed 's/^MEDIA: //')
+
+if [ -z "$IMAGE_PATH" ] || [ ! -f "$IMAGE_PATH" ]; then
+  log_error "Failed to find generated image. Check nano-banana-pro output above."
+  exit 1
 fi
 
-# Extract image URL
-IMAGE_URL=$(echo "$RESPONSE" | jq -r '.images[0].url // empty')
+log_info "Image generated: $IMAGE_PATH"
+log_info "Sending to channel: $CHANNEL"
 
-if [ -z "$IMAGE_URL" ]; then
-    log_error "Failed to extract image URL from response"
-    echo "Response: $RESPONSE"
-    exit 1
-fi
-
-log_info "Image generated successfully!"
-log_info "URL: $IMAGE_URL"
-
-# Get revised prompt if available
-REVISED_PROMPT=$(echo "$RESPONSE" | jq -r '.revised_prompt // empty')
-if [ -n "$REVISED_PROMPT" ]; then
-    log_info "Revised prompt: $REVISED_PROMPT"
+# Default caption
+if [ -z "$CAPTION" ]; then
+  CAPTION="📸"
 fi
 
 # Send via OpenClaw
-log_info "Sending to channel: $CHANNEL"
+openclaw message send \
+  --action send \
+  --channel "$CHANNEL" \
+  --message "$CAPTION" \
+  --media "$IMAGE_PATH"
 
-if [ "$USE_CLI" = true ]; then
-    # Use OpenClaw CLI
-    openclaw message send \
-        --action send \
-        --channel "$CHANNEL" \
-        --message "$CAPTION" \
-        --media "$IMAGE_URL"
-else
-    # Direct API call to local gateway
-    GATEWAY_URL="${OPENCLAW_GATEWAY_URL:-http://localhost:18789}"
-    GATEWAY_TOKEN="${OPENCLAW_GATEWAY_TOKEN:-}"
-
-    HEADERS="-H \"Content-Type: application/json\""
-    if [ -n "$GATEWAY_TOKEN" ]; then
-        HEADERS="$HEADERS -H \"Authorization: Bearer $GATEWAY_TOKEN\""
-    fi
-
-    curl -s -X POST "$GATEWAY_URL/message" \
-        -H "Content-Type: application/json" \
-        ${GATEWAY_TOKEN:+-H "Authorization: Bearer $GATEWAY_TOKEN"} \
-        -d "{
-            \"action\": \"send\",
-            \"channel\": \"$CHANNEL\",
-            \"message\": \"$CAPTION\",
-            \"media\": \"$IMAGE_URL\"
-        }"
-fi
-
-log_info "Done! Image sent to $CHANNEL"
-
-# Output JSON for programmatic use
-echo ""
-echo "--- Result ---"
-jq -n \
-    --arg url "$IMAGE_URL" \
-    --arg channel "$CHANNEL" \
-    --arg prompt "$PROMPT" \
-    '{
-        success: true,
-        image_url: $url,
-        channel: $channel,
-        prompt: $prompt
-    }'
+log_info "Done!"
