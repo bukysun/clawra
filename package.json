@@ -19,8 +19,7 @@
     "imagine",
     "xai",
     "aurora",
-    "fal.ai",
-    "selfie",
+"selfie",
     "ai-agent",
     "image-generation",
     "messaging"
@@ -37,8 +36,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@fal-ai/client": "^1.2.0",
-    "@types/node": "^22.0.0",
+"@types/node": "^22.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.0"
   }
