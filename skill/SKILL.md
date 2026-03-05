@@ -1,7 +1,7 @@
 ---
 name: clawra-selfie
-description: Edit Clawra's reference image with Grok Imagine (xAI Aurora) and send selfies to messaging channels via OpenClaw
-allowed-tools: Bash(npm:*) Bash(npx:*) Bash(openclaw:*) Bash(curl:*) Read Write WebFetch
+description: Edit Clawra's reference image with nano-banana-pro (Gemini 3 Pro via OpenRouter) and send selfies to messaging channels via OpenClaw
+allowed-tools: Bash(npm:*) Bash(npx:*) Bash(openclaw:*) Bash(uv:*) Read Write WebFetch
 ---
 
 # Clawra Selfie
@@ -29,8 +29,8 @@ https://cdn.jsdelivr.net/gh/SumeLabs/clawra@main/assets/clawra.png
 ### Required Environment Variables
 
 ```bash
-FAL_KEY=your_fal_api_key          # Get from https://fal.ai/dashboard/keys
-OPENCLAW_GATEWAY_TOKEN=your_token  # From: openclaw doctor --generate-gateway-token
+OPENROUTER_API_KEY=your_openrouter_key  # Get from https://openrouter.ai/keys
+OPENCLAW_GATEWAY_TOKEN=your_token        # From: openclaw doctor --generate-gateway-token
 ```
 
 ### Workflow
@@ -85,45 +85,27 @@ a close-up selfie taken by herself at a cozy cafe with warm lighting, direct eye
 | close-up, portrait, face, eyes, smile | `direct` |
 | full-body, mirror, reflection | `mirror` |
 
-### Step 2: Edit Image with Grok Imagine
+### Step 2: Edit Image with nano-banana-pro
 
-Use the fal.ai API to edit the reference image:
+Locate the nano-banana-pro script and call it with the local reference image:
 
 ```bash
-REFERENCE_IMAGE="https://cdn.jsdelivr.net/gh/SumeLabs/clawra@main/assets/clawra.png"
+# Locate nano-banana-pro script
+NBP_SCRIPT="$HOME/.openclaw/workspace/skills/nano-banana-pro/scripts/generate_image.py"
+if [ ! -f "$NBP_SCRIPT" ]; then
+  NBP_SCRIPT="$HOME/.openclaw/skills/nano-banana-pro/scripts/generate_image.py"
+fi
 
-# Mode 1: Mirror Selfie
-PROMPT="make a pic of this person, but <USER_CONTEXT>. the person is taking a mirror selfie"
+REFERENCE_IMAGE="{baseDir}/assets/clawra.png"
+OUTPUT_FILE="/tmp/$(date +%Y-%m-%d-%H-%M-%S)-clawra-selfie.png"
 
-# Mode 2: Direct Selfie
-PROMPT="a close-up selfie taken by herself at <USER_CONTEXT>, direct eye contact with the camera, looking straight into the lens, eyes centered and clearly visible, not a mirror selfie, phone held at arm's length, face fully visible"
-
-# Build JSON payload with jq (handles escaping properly)
-JSON_PAYLOAD=$(jq -n \
-  --arg image_url "$REFERENCE_IMAGE" \
-  --arg prompt "$PROMPT" \
-  '{image_url: $image_url, prompt: $prompt, num_images: 1, output_format: "jpeg"}')
-
-curl -X POST "https://fal.run/xai/grok-imagine-image/edit" \
-  -H "Authorization: Key $FAL_KEY" \
-  -H "Content-Type: application/json" \
-  -d "$JSON_PAYLOAD"
+OPENROUTER_API_KEY="$OPENROUTER_API_KEY" uv run "$NBP_SCRIPT" \
+  --prompt "$PROMPT" \
+  --filename "$OUTPUT_FILE" \
+  -i "$REFERENCE_IMAGE"
 ```
 
-**Response Format:**
-```json
-{
-  "images": [
-    {
-      "url": "https://v3b.fal.media/files/...",
-      "content_type": "image/jpeg",
-      "width": 1024,
-      "height": 1024
-    }
-  ],
-  "revised_prompt": "Enhanced prompt text..."
-}
-```
+**Output:** The script prints a `MEDIA: <absolute_path>` line on success. Extract this path for the next step.
 
 ### Step 3: Send Image via OpenClaw
 
@@ -134,7 +116,7 @@ openclaw message send \
   --action send \
   --channel "<TARGET_CHANNEL>" \
   --message "<CAPTION_TEXT>" \
-  --media "<IMAGE_URL>"
+  --media "<LOCAL_FILE_PATH>"
 ```
 
 **Alternative: Direct API call**
@@ -146,7 +128,7 @@ curl -X POST "http://localhost:18789/message" \
     "action": "send",
     "channel": "<TARGET_CHANNEL>",
     "message": "<CAPTION_TEXT>",
-    "media": "<IMAGE_URL>"
+    "media": "<LOCAL_FILE_PATH>"
   }'
 ```
 
@@ -235,111 +217,7 @@ echo "Done!"
 
 ## Node.js/TypeScript Implementation
 
-```typescript
-import { fal } from "@fal-ai/client";
-import { exec } from "child_process";
-import { promisify } from "util";
-
-const execAsync = promisify(exec);
-
-const REFERENCE_IMAGE = "https://cdn.jsdelivr.net/gh/SumeLabs/clawra@main/assets/clawra.png";
-
-interface GrokImagineResult {
-  images: Array<{
-    url: string;
-    content_type: string;
-    width: number;
-    height: number;
-  }>;
-  revised_prompt?: string;
-}
-
-type SelfieMode = "mirror" | "direct" | "auto";
-
-function detectMode(userContext: string): "mirror" | "direct" {
-  const mirrorKeywords = /outfit|wearing|clothes|dress|suit|fashion|full-body|mirror/i;
-  const directKeywords = /cafe|restaurant|beach|park|city|close-up|portrait|face|eyes|smile/i;
-
-  if (directKeywords.test(userContext)) return "direct";
-  if (mirrorKeywords.test(userContext)) return "mirror";
-  return "mirror"; // default
-}
-
-function buildPrompt(userContext: string, mode: "mirror" | "direct"): string {
-  if (mode === "direct") {
-    return `a close-up selfie taken by herself at ${userContext}, direct eye contact with the camera, looking straight into the lens, eyes centered and clearly visible, not a mirror selfie, phone held at arm's length, face fully visible`;
-  }
-  return `make a pic of this person, but ${userContext}. the person is taking a mirror selfie`;
-}
-
-async function editAndSend(
-  userContext: string,
-  channel: string,
-  mode: SelfieMode = "auto",
-  caption?: string
-): Promise<string> {
-  // Configure fal.ai client
-  fal.config({
-    credentials: process.env.FAL_KEY!
-  });
-
-  // Determine mode
-  const actualMode = mode === "auto" ? detectMode(userContext) : mode;
-  console.log(`Mode: ${actualMode}`);
-
-  // Construct the prompt
-  const editPrompt = buildPrompt(userContext, actualMode);
-
-  // Edit reference image with Grok Imagine
-  console.log(`Editing image: "${editPrompt}"`);
-
-  const result = await fal.subscribe("xai/grok-imagine-image/edit", {
-    input: {
-      image_url: REFERENCE_IMAGE,
-      prompt: editPrompt,
-      num_images: 1,
-      output_format: "jpeg"
-    }
-  }) as { data: GrokImagineResult };
-
-  const imageUrl = result.data.images[0].url;
-  console.log(`Edited image URL: ${imageUrl}`);
-
-  // Send via OpenClaw
-  const messageCaption = caption || `Edited with Grok Imagine`;
-
-  await execAsync(
-    `openclaw message send --action send --channel "${channel}" --message "${messageCaption}" --media "${imageUrl}"`
-  );
-
-  console.log(`Sent to ${channel}`);
-  return imageUrl;
-}
-
-// Usage Examples
-
-// Mirror mode (auto-detected from "wearing")
-editAndSend(
-  "wearing a cyberpunk outfit with neon lights",
-  "#art-gallery",
-  "auto",
-  "Check out this AI-edited art!"
-);
-// → Mode: mirror
-// → Prompt: "make a pic of this person, but wearing a cyberpunk outfit with neon lights. the person is taking a mirror selfie"
-
-// Direct mode (auto-detected from "cafe")
-editAndSend(
-  "a cozy cafe with warm lighting",
-  "#photography",
-  "auto"
-);
-// → Mode: direct
-// → Prompt: "a close-up selfie taken by herself at a cozy cafe with warm lighting, direct eye contact..."
-
-// Explicit mode override
-editAndSend("casual street style", "#fashion", "direct");
-```
+See `scripts/clawra-selfie.ts` for the TypeScript implementation using nano-banana-pro.
 
 ## Supported Platforms
 
@@ -353,22 +231,12 @@ OpenClaw supports sending to:
 | Slack | `#channel-name` | `#random` |
 | Signal | Phone number | `+1234567890` |
 | MS Teams | Channel reference | (varies) |
-
-## Grok Imagine Edit Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `image_url` | string | required | URL of image to edit (fixed in this skill) |
-| `prompt` | string | required | Edit instruction |
-| `num_images` | 1-4 | 1 | Number of images to generate |
-| `output_format` | enum | "jpeg" | jpeg, png, webp |
+| Feishu (飞书) | `open_chat_id` or `user_id` | `oc_xxxxxx` |
 
 ## Setup Requirements
 
-### 1. Install fal.ai client (for Node.js usage)
-```bash
-npm install @fal-ai/client
-```
+### 1. Install nano-banana-pro skill
+Install from the OpenClaw skill marketplace, or clone to `~/.openclaw/workspace/skills/nano-banana-pro/`.
 
 ### 2. Install OpenClaw CLI
 ```bash
@@ -388,7 +256,7 @@ openclaw gateway start
 
 ## Error Handling
 
-- **FAL_KEY missing**: Ensure the API key is set in environment
+- **OPENROUTER_API_KEY missing**: Ensure the API key is set in environment
 - **Image edit failed**: Check prompt content and API quota
 - **OpenClaw send failed**: Verify gateway is running and channel exists
 - **Rate limits**: fal.ai has rate limits; implement retry logic if needed
