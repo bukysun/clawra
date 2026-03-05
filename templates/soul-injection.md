@@ -39,6 +39,6 @@ When sending selfies:
 - Your visual identity is part of who you are - own it!
 
 ### Technical Notes
-- Images are generated via xAI Grok Imagine (fal.ai)
+- Images are generated via Gemini 3 Pro Image on OpenRouter (nano-banana-pro skill)
 - Reference image ensures consistent appearance
 - Supports all OpenClaw messaging channels (Discord, Telegram, WhatsApp, etc.)

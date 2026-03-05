@@ -10,7 +10,7 @@ npx clawra@latest
 
 This will:
 1. Check OpenClaw is installed
-2. Guide you to get a fal.ai API key
+2. Guide you to get an OpenRouter API key
 3. Install the skill to `~/.openclaw/skills/clawra-selfie/`
 4. Configure OpenClaw to use the skill
 5. Add selfie capabilities to your agent's SOUL.md
@@ -32,7 +32,8 @@ Clawra Selfie enables your OpenClaw agent to:
 ## Prerequisites
 
 - [OpenClaw](https://github.com/openclaw/openclaw) installed and configured
-- [fal.ai](https://fal.ai) account (free tier available)
+- [OpenRouter](https://openrouter.ai) account (free tier available)
+- `nano-banana-pro` skill installed in OpenClaw
 
 ## Manual Installation
 
@@ -40,7 +41,7 @@ If you prefer manual setup:
 
 ### 1. Get API Key
 
-Visit [fal.ai/dashboard/keys](https://fal.ai/dashboard/keys) and create an API key.
+Visit [openrouter.ai/keys](https://openrouter.ai/keys) and create an API key.
 
 ### 2. Clone the Skill
 
@@ -59,7 +60,7 @@ Add to `~/.openclaw/openclaw.json`:
       "clawra-selfie": {
         "enabled": true,
         "env": {
-          "FAL_KEY": "your_fal_key_here"
+          "OPENROUTER_API_KEY": "your_openrouter_key_here"
         }
       }
     }
@@ -101,9 +102,19 @@ This ensures consistent appearance across all generated images.
 
 ## Technical Details
 
-- **Image Generation**: xAI Grok Imagine via fal.ai
+- **Image Generation**: Gemini 3 Pro Image via OpenRouter (nano-banana-pro skill)
 - **Messaging**: OpenClaw Gateway API
-- **Supported Platforms**: Discord, Telegram, WhatsApp, Slack, Signal, MS Teams
+- **Supported Platforms**:
+
+| Platform | ID Type | Example |
+|----------|---------|---------|
+| Discord | channel_id | 123456789 |
+| Telegram | chat_id | -100123456 |
+| WhatsApp | phone number | +1234567890 |
+| Slack | channel_id | C01234567 |
+| Signal | phone number | +1234567890 |
+| MS Teams | channel_id | 19:xxxxx |
+| Feishu (飞书) | open_chat_id or user_id | oc_xxxxxx |
 
 ## Project Structure
 
