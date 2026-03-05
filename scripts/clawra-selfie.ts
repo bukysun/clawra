@@ -1,10 +1,11 @@
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import * as crypto from "crypto";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 type SelfieMode = "mirror" | "direct" | "auto";
 
@@ -56,12 +57,13 @@ async function editAndSend(
   const prompt = buildPrompt(userContext, actualMode);
   console.log(`Prompt: ${prompt}`);
 
-  const now = new Date().toISOString().replace(/[T:]/g, "-").slice(0, 19);
-  const outputFile = `/tmp/${now}-clawra-selfie.png`;
+  const suffix = crypto.randomUUID().slice(0, 8);
+  const outputFile = `/tmp/clawra-selfie-${suffix}.png`;
 
   console.log("Generating image with nano-banana-pro...");
-  const { stdout } = await execAsync(
-    `uv run "${nbpScript}" --prompt "${prompt.replace(/"/g, '\\"')}" --filename "${outputFile}" -i "${referenceImage}"`,
+  const { stdout } = await execFileAsync(
+    "uv",
+    ["run", nbpScript, "--prompt", prompt, "--filename", outputFile, "-i", referenceImage],
     { env: { ...process.env, OPENROUTER_API_KEY: apiKey } }
   );
 
@@ -79,13 +81,22 @@ async function editAndSend(
   console.log(`Sending to ${channel}...`);
 
   const messageCaption = caption ?? "📸";
-  await execAsync(
-    `openclaw message send --action send --channel "${channel}" --message "${messageCaption}" --media "${imagePath}"`
-  );
+  await execFileAsync("openclaw", [
+    "message", "send",
+    "--action", "send",
+    "--channel", channel,
+    "--message", messageCaption,
+    "--media", imagePath,
+  ]);
 
   console.log("Done!");
   return imagePath;
 }
 
 // Example usage
-editAndSend("wearing a cyberpunk outfit with neon lights", "#general", "auto", "New fit 🔥");
+editAndSend("wearing a cyberpunk outfit with neon lights", "#general", "auto", "New fit 🔥").catch(
+  (err) => {
+    console.error(err);
+    process.exit(1);
+  }
+);
