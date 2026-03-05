@@ -170,7 +170,7 @@ ${c("magenta", "│")}  ${c("bright", "Clawra Selfie")} - OpenClaw Skill Install
 ${c("magenta", "└─────────────────────────────────────────┘")}
 
 Add selfie generation superpowers to your OpenClaw agent!
-Uses ${c("cyan", "xAI Grok Imagine")} via ${c("cyan", "fal.ai")} for image editing.
+Uses ${c("cyan", "xAI Grok Imagine")} via ${c("cyan", "OpenRouter")} for image editing.
 `);
 }
 
@@ -207,40 +207,40 @@ async function checkPrerequisites() {
   return true;
 }
 
-// Get FAL API key
-async function getFalApiKey(rl) {
-  logStep("2/7", "Setting up fal.ai API key...");
+// Get OpenRouter API key
+async function getOpenRouterApiKey(rl) {
+  logStep("2/7", "Setting up OpenRouter API key...");
 
-  const FAL_URL = "https://fal.ai/dashboard/keys";
+  const API_KEY_URL = "https://openrouter.ai/keys";
 
-  log(`\nTo use Grok Imagine, you need a fal.ai API key.`);
-  log(`${c("cyan", "→")} Get your key from: ${c("bright", FAL_URL)}\n`);
+  log(`\nTo use Grok Imagine, you need an OpenRouter API key.`);
+  log(`${c("cyan", "→")} Get your key from: ${c("bright", API_KEY_URL)}\n`);
 
-  const openIt = await ask(rl, "Open fal.ai in browser? (Y/n): ");
+  const openIt = await ask(rl, "Open OpenRouter in browser? (Y/n): ");
 
   if (openIt.toLowerCase() !== "n") {
     logInfo("Opening browser...");
-    if (!openBrowser(FAL_URL)) {
+    if (!openBrowser(API_KEY_URL)) {
       logWarn("Could not open browser automatically");
-      logInfo(`Please visit: ${FAL_URL}`);
+      logInfo(`Please visit: ${API_KEY_URL}`);
     }
   }
 
   log("");
-  const falKey = await ask(rl, "Enter your FAL_KEY: ");
+  const apiKey = await ask(rl, "Enter your OPENROUTER_API_KEY: ");
 
-  if (!falKey) {
-    logError("FAL_KEY is required!");
+  if (!apiKey) {
+    logError("OPENROUTER_API_KEY is required!");
     return null;
   }
 
   // Basic validation
-  if (falKey.length < 10) {
+  if (apiKey.length < 10) {
     logWarn("That key looks too short. Make sure you copied the full key.");
   }
 
   logSuccess("API key received");
-  return falKey;
+  return apiKey;
 }
 
 // Install skill files
@@ -287,7 +287,7 @@ async function installSkill() {
 }
 
 // Update OpenClaw config
-async function updateOpenClawConfig(falKey) {
+async function updateOpenClawConfig(openRouterKey) {
   logStep("4/7", "Updating OpenClaw configuration...");
 
   let config = readJsonFile(OPENCLAW_CONFIG) || {};
@@ -298,9 +298,8 @@ async function updateOpenClawConfig(falKey) {
       entries: {
         [SKILL_NAME]: {
           enabled: true,
-          apiKey: falKey,
           env: {
-            FAL_KEY: falKey,
+            OPENROUTER_API_KEY: openRouterKey,
           },
         },
       },
@@ -447,7 +446,7 @@ ${c("dim", "Your agent now has selfie superpowers!")}
 }
 
 // Handle reinstall
-async function handleReinstall(rl, falKey) {
+async function handleReinstall(rl, openRouterKey) {
   const reinstall = await ask(rl, "\nReinstall/update? (y/N): ");
 
   if (reinstall.toLowerCase() !== "y") {
@@ -485,9 +484,9 @@ async function main() {
       }
     }
 
-    // Step 2: Get FAL API key
-    const falKey = await getFalApiKey(rl);
-    if (!falKey) {
+    // Step 2: Get OpenRouter API key
+    const openRouterKey = await getOpenRouterApiKey(rl);
+    if (!openRouterKey) {
       rl.close();
       process.exit(1);
     }
@@ -496,7 +495,7 @@ async function main() {
     await installSkill();
 
     // Step 4: Update OpenClaw config
-    await updateOpenClawConfig(falKey);
+    await updateOpenClawConfig(openRouterKey);
 
     // Step 5: Write IDENTITY.md
     await writeIdentity();
