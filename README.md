@@ -34,6 +34,7 @@ Clawra Selfie enables your OpenClaw agent to:
 - [OpenClaw](https://github.com/openclaw/openclaw) installed and configured
 - [OpenRouter](https://openrouter.ai) account (free tier available)
 - `nano-banana-pro` skill installed in OpenClaw
+  Install from the OpenClaw skill marketplace, or clone to `~/.openclaw/workspace/skills/nano-banana-pro/`
 
 ## Manual Installation
 
@@ -60,13 +61,15 @@ Add to `~/.openclaw/openclaw.json`:
       "clawra-selfie": {
         "enabled": true,
         "env": {
-          "OPENROUTER_API_KEY": "your_openrouter_key_here"
+          "OPENROUTER_API_KEY": "your_openrouter_key_here",
+          "OPENCLAW_GATEWAY_TOKEN": "your_gateway_token_here"
         }
       }
     }
   }
 }
 ```
+Generate the gateway token with: `openclaw doctor --generate-gateway-token`
 
 ### 4. Update SOUL.md
 
@@ -122,12 +125,15 @@ This ensures consistent appearance across all generated images.
 clawra/
 ├── bin/
 │   └── cli.js           # npx installer
-├── skill/
-│   ├── SKILL.md         # Skill definition
+├── skill/               # Installed to ~/.openclaw/skills/clawra-selfie/
+│   ├── SKILL.md         # Skill definition (copy of root SKILL.md)
 │   ├── scripts/         # Generation scripts
 │   └── assets/          # Reference image
+├── scripts/             # Development copies (mirrored to skill/scripts/)
+├── assets/              # Development copies (mirrored to skill/assets/)
 ├── templates/
 │   └── soul-injection.md # Persona template
+├── SKILL.md             # Root skill definition (fallback for development)
 └── package.json
 ```
 
