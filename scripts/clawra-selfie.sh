@@ -102,7 +102,7 @@ NBP_OUTPUT=$(OPENROUTER_API_KEY="$OPENROUTER_API_KEY" uv run "$NBP_SCRIPT" \
 echo "$NBP_OUTPUT"
 
 # Extract local file path from MEDIA: line
-IMAGE_PATH=$(echo "$NBP_OUTPUT" | grep '^MEDIA:' | sed 's/^MEDIA: //')
+IMAGE_PATH=$(echo "$NBP_OUTPUT" | grep '^MEDIA:' | head -1 | sed 's/^MEDIA:[[:space:]]*//' | tr -d '\r' | sed 's/[[:space:]]*$//')
 
 if [ -z "$IMAGE_PATH" ] || [ ! -f "$IMAGE_PATH" ]; then
   log_error "Failed to find generated image. Check nano-banana-pro output above."
