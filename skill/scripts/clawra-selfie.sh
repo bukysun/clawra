@@ -2,13 +2,13 @@
 # clawra-selfie.sh
 # Edit Clawra's reference image and send to a channel via OpenClaw
 #
-# Usage: ./clawra-selfie.sh "<user_context>" "<channel>" [mode] [caption]
+# Usage: ./clawra-selfie.sh "<user_context>" "<platform>" "<target>" [mode] [caption]
 #
 # Environment variables required:
 #   OPENROUTER_API_KEY - Your OpenRouter API key (https://openrouter.ai/keys)
 #
 # Example:
-#   OPENROUTER_API_KEY=your_key ./clawra-selfie.sh "wearing a cowboy hat" "#general" mirror
+#   OPENROUTER_API_KEY=your_key ./clawra-selfie.sh "wearing a cowboy hat" feishu oc_xxxxxx mirror
 
 set -euo pipefail
 
@@ -47,14 +47,16 @@ fi
 
 # Parse arguments
 USER_CONTEXT="${1:-}"
-CHANNEL="${2:-}"
-MODE="${3:-auto}"
-CAPTION="${4:-}"
+PLATFORM="${2:-}"
+TARGET="${3:-}"
+MODE="${4:-auto}"
+CAPTION="${5:-}"
 
-if [ -z "$USER_CONTEXT" ] || [ -z "$CHANNEL" ]; then
-  echo "Usage: $0 <user_context> <channel> [mode] [caption]"
+if [ -z "$USER_CONTEXT" ] || [ -z "$PLATFORM" ] || [ -z "$TARGET" ]; then
+  echo "Usage: $0 <user_context> <platform> <target> [mode] [caption]"
+  echo "Platforms: feishu, telegram, discord, slack, whatsapp, signal..."
   echo "Modes: mirror, direct, auto (default)"
-  echo "Example: $0 'wearing a cowboy hat' '#general' mirror"
+  echo "Example: $0 'wearing a cowboy hat' feishu oc_xxxxxx mirror"
   exit 1
 fi
 
@@ -110,7 +112,7 @@ if [ -z "$IMAGE_PATH" ] || [ ! -f "$IMAGE_PATH" ]; then
 fi
 
 log_info "Image generated: $IMAGE_PATH"
-log_info "Sending to channel: $CHANNEL"
+log_info "Sending to $PLATFORM / $TARGET"
 
 # Default caption
 if [ -z "$CAPTION" ]; then
@@ -119,8 +121,8 @@ fi
 
 # Send via OpenClaw
 openclaw message send \
-  --action send \
-  --channel "$CHANNEL" \
+  --channel "$PLATFORM" \
+  --target "$TARGET" \
   --message "$CAPTION" \
   --media "$IMAGE_PATH"
 
