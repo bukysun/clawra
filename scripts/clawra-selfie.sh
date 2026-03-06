@@ -51,12 +51,13 @@ PLATFORM="${2:-}"
 TARGET="${3:-}"
 MODE="${4:-auto}"
 CAPTION="${5:-}"
+ACCOUNT="${6:-}"  # optional: openclaw account id (e.g. feishu-home)
 
 if [ -z "$USER_CONTEXT" ] || [ -z "$PLATFORM" ] || [ -z "$TARGET" ]; then
-  echo "Usage: $0 <user_context> <platform> <target> [mode] [caption]"
+  echo "Usage: $0 <user_context> <platform> <target> [mode] [caption] [account]"
   echo "Platforms: feishu, telegram, discord, slack, whatsapp, signal..."
   echo "Modes: mirror, direct, auto (default)"
-  echo "Example: $0 'wearing a cowboy hat' feishu oc_xxxxxx mirror"
+  echo "Example: $0 'wearing a cowboy hat' feishu oc_xxxxxx mirror '' feishu-home"
   exit 1
 fi
 
@@ -120,10 +121,10 @@ if [ -z "$CAPTION" ]; then
 fi
 
 # Send via OpenClaw
-openclaw message send \
-  --channel "$PLATFORM" \
-  --target "$TARGET" \
-  --message "$CAPTION" \
-  --media "$IMAGE_PATH"
+SEND_ARGS=(--channel "$PLATFORM" --target "$TARGET" --message "$CAPTION" --media "$IMAGE_PATH")
+if [ -n "$ACCOUNT" ]; then
+  SEND_ARGS+=(--account "$ACCOUNT")
+fi
+openclaw message send "${SEND_ARGS[@]}"
 
 log_info "Done!"
