@@ -26,11 +26,13 @@ Edit a fixed reference image using Gemini 3 Pro Image via OpenRouter (nano-banan
 
 ## Reference Image
 
-The skill uses a fixed reference image hosted on jsDelivr CDN:
+The skill uses a fixed reference image stored locally in the skill's `assets/` directory:
 
 ```
-https://cdn.jsdelivr.net/gh/SumeLabs/clawra@main/assets/clawra.png
+{baseDir}/assets/clawra.png
 ```
+
+Where `{baseDir}` is the skill's installation directory (e.g. `~/.openclaw/skills/clawra-selfie/`).
 
 ## When to Use
 
