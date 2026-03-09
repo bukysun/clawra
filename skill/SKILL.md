@@ -86,12 +86,12 @@ make a pic of this person, but wearing a santa hat. the person is taking a mirro
 Best for: close-up portraits, location shots, emotional expressions
 
 ```
-a close-up selfie taken by herself at [user's context], direct eye contact with the camera, looking straight into the lens, eyes centered and clearly visible, not a mirror selfie, phone held at arm's length, face fully visible
+a close-up selfie taken by herself at [user's context], direct eye contact with the camera, looking straight into the lens, eyes centered and clearly visible, face fully visible, no phone visible in the image
 ```
 
 **Example**: "a cozy cafe with warm lighting" →
 ```
-a close-up selfie taken by herself at a cozy cafe with warm lighting, direct eye contact with the camera, looking straight into the lens, eyes centered and clearly visible, not a mirror selfie, phone held at arm's length, face fully visible
+a close-up selfie taken by herself at a cozy cafe with warm lighting, direct eye contact with the camera, looking straight into the lens, eyes centered and clearly visible, face fully visible, no phone visible in the image
 ```
 
 ### Mode Selection Logic

@@ -84,7 +84,7 @@ fi
 
 # Build prompt
 if [ "$MODE" == "direct" ]; then
-  PROMPT="a close-up selfie taken by herself at $USER_CONTEXT, direct eye contact with the camera, looking straight into the lens, eyes centered and clearly visible, not a mirror selfie, phone held at arm's length, face fully visible"
+  PROMPT="a close-up selfie taken by herself at $USER_CONTEXT, direct eye contact with the camera, looking straight into the lens, eyes centered and clearly visible, face fully visible, no phone visible in the image"
 else
   PROMPT="make a pic of this person, but $USER_CONTEXT. the person is taking a mirror selfie"
 fi

@@ -30,7 +30,7 @@ function detectMode(userContext: string): "mirror" | "direct" {
 
 function buildPrompt(userContext: string, mode: "mirror" | "direct"): string {
   if (mode === "direct") {
-    return `a close-up selfie taken by herself at ${userContext}, direct eye contact with the camera, looking straight into the lens, eyes centered and clearly visible, not a mirror selfie, phone held at arm's length, face fully visible`;
+    return `a close-up selfie taken by herself at ${userContext}, direct eye contact with the camera, looking straight into the lens, eyes centered and clearly visible, face fully visible, no phone visible in the image`;
   }
   return `make a pic of this person, but ${userContext}. the person is taking a mirror selfie`;
 }
