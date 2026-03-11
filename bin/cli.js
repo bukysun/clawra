@@ -33,8 +33,6 @@ const OPENCLAW_DIR = path.join(HOME, ".openclaw");
 const OPENCLAW_CONFIG = path.join(OPENCLAW_DIR, "openclaw.json");
 const OPENCLAW_SKILLS_DIR = path.join(OPENCLAW_DIR, "skills");
 const OPENCLAW_WORKSPACE = path.join(OPENCLAW_DIR, "workspace");
-const SOUL_MD = path.join(OPENCLAW_WORKSPACE, "SOUL.md");
-const IDENTITY_MD = path.join(OPENCLAW_WORKSPACE, "IDENTITY.md");
 const SKILL_NAME = "clawra-selfie";
 const SKILL_DEST = path.join(OPENCLAW_SKILLS_DIR, SKILL_NAME);
 
@@ -176,7 +174,7 @@ Uses ${c("cyan", "Gemini 3 Pro Image")} via ${c("cyan", "OpenRouter")} for image
 
 // Check prerequisites
 async function checkPrerequisites() {
-  logStep("1/4", "Checking prerequisites...");
+  logStep("1/6", "Checking prerequisites...");
 
   // Check OpenClaw CLI
   if (!commandExists("openclaw")) {
@@ -207,9 +205,51 @@ async function checkPrerequisites() {
   return true;
 }
 
+// Select target agent for persona injection
+async function selectAgent(rl) {
+  logStep("2/6", "Selecting target agent...");
+
+  const config = readJsonFile(OPENCLAW_CONFIG);
+  const agentList = config?.agents?.list || [];
+
+  // Build candidates: named agents with a workspace
+  const candidates = agentList
+    .filter((a) => a.id && a.workspace)
+    .map((a) => ({ id: a.id, name: a.name || a.id, workspace: a.workspace }));
+
+  // Always include default workspace as fallback
+  const defaultEntry = { id: "main", name: "main (default)", workspace: OPENCLAW_WORKSPACE };
+  if (!candidates.find((a) => a.id === "main")) {
+    candidates.unshift(defaultEntry);
+  }
+
+  if (candidates.length === 1) {
+    logSuccess(`Using agent: ${candidates[0].name} (${candidates[0].workspace})`);
+    return candidates[0].workspace;
+  }
+
+  log("\nAvailable agents:");
+  candidates.forEach((a, i) => {
+    log(`  ${c("cyan", `${i + 1}.`)} ${a.name}  ${c("dim", a.workspace)}`);
+  });
+  log("");
+
+  const answer = await ask(rl, `Select agent [1-${candidates.length}]: `);
+  const idx = parseInt(answer, 10) - 1;
+
+  if (isNaN(idx) || idx < 0 || idx >= candidates.length) {
+    logWarn("Invalid selection, using default workspace.");
+    return OPENCLAW_WORKSPACE;
+  }
+
+  const selected = candidates[idx];
+  logSuccess(`Selected: ${selected.name}`);
+  return selected.workspace;
+}
+
 // Get OpenRouter API key
 async function getOpenRouterApiKey(rl) {
-  logStep("2/4", "Setting up OpenRouter API key...");
+  logStep("3/6", "Setting up OpenRouter API key...");
 
   const API_KEY_URL = "https://openrouter.ai/keys";
 
@@ -245,7 +285,7 @@ async function getOpenRouterApiKey(rl) {
 
 // Install skill files
 async function installSkill() {
-  logStep("3/4", "Installing skill files...");
+  logStep("4/6", "Installing skill files...");
 
   // Create skill directory
   fs.mkdirSync(SKILL_DEST, { recursive: true });
@@ -288,7 +328,7 @@ async function installSkill() {
 
 // Update OpenClaw config
 async function updateOpenClawConfig(openRouterKey) {
-  logStep("4/4", "Updating OpenClaw configuration...");
+  logStep("5/6", "Updating OpenClaw configuration...");
 
   let config = readJsonFile(OPENCLAW_CONFIG) || {};
 
@@ -325,10 +365,71 @@ async function updateOpenClawConfig(openRouterKey) {
   return true;
 }
 
-// Write IDENTITY.md
+// Write IDENTITY.md from the ## Identity section in persona.md
+function writeIdentity(agentWorkspace) {
+  logStep("5/6", "Writing IDENTITY.md...");
+
+  const personaPath = path.join(SKILL_DEST, "assets", "persona.md");
+  if (!fs.existsSync(personaPath)) {
+    logWarn("persona.md not found, skipping IDENTITY.md");
+    return;
+  }
+
+  const content = fs.readFileSync(personaPath, "utf8");
+  const parts = content.split(/^## /m);
+  const identityPart = parts.find((p) => p.startsWith("Identity"));
+  if (!identityPart) {
+    logWarn("No ## Identity section found in persona.md, skipping IDENTITY.md");
+    return;
+  }
+
+  const identityBody = identityPart.replace(/^Identity\n/, "").trim();
+  const identityContent = `# IDENTITY.md - Who Am I?\n\n${identityBody}\n`;
+
+  const identityMd = path.join(agentWorkspace, "IDENTITY.md");
+  fs.mkdirSync(agentWorkspace, { recursive: true });
+  fs.writeFileSync(identityMd, identityContent);
+  logSuccess(`Written: ${identityMd}`);
+}
+
+// Inject persona into SOUL.md (idempotent via markers)
+function injectPersona(agentWorkspace) {
+  logStep("6/6", "Injecting persona into SOUL.md...");
+
+  const personaPath = path.join(SKILL_DEST, "assets", "persona.md");
+  if (!fs.existsSync(personaPath)) {
+    logWarn("persona.md not found, skipping SOUL.md injection");
+    return;
+  }
+
+  const soulMd = path.join(agentWorkspace, "SOUL.md");
+  let personaContent = fs.readFileSync(personaPath, "utf8");
+  // Strip ## Identity section — that belongs in IDENTITY.md only
+  personaContent = personaContent.split(/^## /m)
+    .filter((p) => !p.startsWith("Identity"))
+    .join("## ")
+    .trimEnd();
+  const injection = `\n<!-- clawra-selfie:start -->\n${personaContent}\n<!-- clawra-selfie:end -->\n`;
+
+  fs.mkdirSync(agentWorkspace, { recursive: true });
+
+  let soulContent = "";
+  if (fs.existsSync(soulMd)) {
+    soulContent = fs.readFileSync(soulMd, "utf8");
+    // Remove existing injection if present
+    soulContent = soulContent.replace(
+      /\n<!-- clawra-selfie:start -->[\s\S]*?<!-- clawra-selfie:end -->\n/g,
+      ""
+    );
+  }
+
+  fs.writeFileSync(soulMd, soulContent + injection);
+  logSuccess(`Updated: ${soulMd}`);
+}
+
 // Final summary
-function printSummary() {
-  logStep("4/4", "Installation complete!");
+function printSummary(agentWorkspace) {
+  logStep("6/6", "Installation complete!");
 
   console.log(`
 ${c("green", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")}
@@ -341,12 +442,16 @@ ${c("cyan", "Installed files:")}
 ${c("cyan", "Configuration:")}
   ${OPENCLAW_CONFIG}
 
+${c("cyan", "Persona injected into:")}
+  ${path.join(agentWorkspace, "IDENTITY.md")}
+  ${path.join(agentWorkspace, "SOUL.md")}
+
 ${c("yellow", "Try saying to your agent:")}
   "Send me a selfie"
   "Send a pic wearing a cowboy hat"
   "What are you doing right now?"
 
-${c("dim", "Persona is loaded from the skill — your global SOUL.md and IDENTITY.md are untouched.")}
+${c("dim", "To update the persona, edit assets/persona.md in the skill directory and reinstall.")}
 `);
 }
 
@@ -389,19 +494,28 @@ async function main() {
       }
     }
 
-    // Step 2: Get OpenRouter API key
+    // Step 2: Select target agent
+    const agentWorkspace = await selectAgent(rl);
+
+    // Step 3: Get OpenRouter API key
     const openRouterKey = await getOpenRouterApiKey(rl);
     if (!openRouterKey) {
       rl.close();
       process.exit(1);
     }
 
-    // Step 3: Install skill files
+    // Step 4: Install skill files
     await installSkill();
 
-    // Step 4: Update OpenClaw config + summary
+    // Step 5: Update OpenClaw config
     await updateOpenClawConfig(openRouterKey);
-    printSummary();
+
+    // Step 5: Write IDENTITY.md
+    writeIdentity(agentWorkspace);
+
+    // Step 6: Inject persona into SOUL.md + summary
+    injectPersona(agentWorkspace);
+    printSummary(agentWorkspace);
 
     rl.close();
   } catch (error) {
